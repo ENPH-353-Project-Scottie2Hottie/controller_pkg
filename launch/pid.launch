@@ -1,0 +1,8 @@
+<launch>
+   <!-- My Package launch file -->
+   <node pkg="ros_ws/src/controller_pkg/node"
+         type="controllernode.py"
+         name="controller" 
+         output="screen">
+   </node>
+</launch>
