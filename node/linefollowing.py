@@ -8,10 +8,15 @@ import numpy as np
 import matplotlib as plt
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
+import time
 
 velocity = 0.15
-multiplier = 0.015
-v_multiplier = 0.001
+a_multiplier = 0.006
+v_multiplier = 0.002
+global flag
+flag = 0
+global mask
+mask = None
 
 
 def callback(data):
@@ -61,51 +66,70 @@ def callback(data):
 
 	red_line_detector = cv2.inRange(hsv, lower_hsv, upper_hsv)
 
-
-	###################################################################
-	
-
-	# Construct right guide-line equation (w = m*h + b):
-	m = 8.7/6
-	b = 2.4*width/24.6
-
-
-	reference = int(0.75 * width)
-	
-
-	cropped = binary[int(0.7*height):,int(0.5*width):]
-
-	mask = np.zeros((height,width,1), np.uint8)
-	cv2.rectangle(mask, (int(0.5*width),int(0.75*height)),(width,height),(255,0,0),-1)
-
-	masked_img = cv2.bitwise_and(binary, mask)
-	cv2.imshow("masked", masked_img)
-
-	M = cv2.moments(masked_img)
-
-
-	cX = int(M["m10"] / M["m00"])
-	cY = int(M["m01"] / M["m00"])
-
-
-	desiredX = int(m*cY + b)
-
-	currState = cv2.circle(cv_image, (cX, cY), 10, (0,0,255))
-	desiredState = cv2.circle(cv_image, (desiredX, cY), 10, (255,0,0))
-	cv2.imshow("", desiredState)
-	cv2.waitKey(1)
-
-	error = desiredX - cX
-
-	angular = float(multiplier*(error)) 
-	print(angular)
-
-	# Publisher: publish velocity commands
+	M = cv2.moments(red_line_detector)
 
 	move = Twist()
 
-	move.angular.z = angular
-	move.linear.x = velocity*(1 - v_multiplier*abs(error))
+
+	if M["m00"] != 0:
+		move.angular.z = 0
+		move.linear.x = velocity
+
+	else:
+		###################################################################
+		
+
+		# Construct right guide-line equation (w = m*h + b):
+		# #Original:
+		# m = 8.7/6
+		# b = 2.4*width/24.6
+
+		# Experiment:
+		b_shift = 30
+		m = 8.7/6
+		b = 2.4*width/24.6 + b_shift
+
+
+		reference = int(0.75 * width)
+		
+
+		cropped = binary[int(0.7*height):,int(0.5*width):]
+
+		if flag == 0:
+			global mask
+			mask = np.zeros((height,width,1), np.uint8)
+			cv2.rectangle(mask, (int(0.5*width),int(0.75*height)),(width,height),(255,0,0),-1)
+			print("declared mask")
+			global flag
+			flag = 1
+		
+
+		masked_img = cv2.bitwise_and(binary, mask)
+		cv2.imshow("masked", masked_img)
+
+		M = cv2.moments(masked_img)
+
+
+		cX = int(M["m10"] / M["m00"])
+		cY = int(M["m01"] / M["m00"])
+
+
+		desiredX = int(m*cY + b)
+
+		currState = cv2.circle(cv_image, (cX, cY), 10, (0,0,255))
+		desiredState = cv2.circle(cv_image, (desiredX, cY), 10, (255,0,0))
+		cv2.imshow("", desiredState)
+		cv2.waitKey(1)
+
+		error = desiredX - cX
+
+		angular = float(a_multiplier*(error)) 
+		print(angular)
+
+		# Publisher: publish velocity commands
+
+		move.angular.z = angular
+		move.linear.x = velocity*(1 - v_multiplier*abs(error))
 
 	pub.publish(move)
 	
@@ -118,4 +142,5 @@ if __name__ == "__main__":
 	pub = rospy.Publisher('/R1/cmd_vel', Twist, 
   	queue_size=1)
 	rospy.Subscriber("/R1/pi_camera/image_raw", Image, callback)
+	time.sleep(1)
 	rospy.spin()
