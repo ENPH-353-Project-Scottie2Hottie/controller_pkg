@@ -1,8 +1,15 @@
 <launch>
    <!-- My Package launch file -->
-   <node pkg="ros_ws/src/controller_pkg/node"
-         type="controllernode.py"
-         name="controller" 
-         output="screen">
+   <node pkg="controller_pkg"
+         type="pid_controller.py"
+         name="pid_controller">
+   </node>
+   <node pkg="controller_pkg"
+         type="red_line_detector.py"
+         name="red_line_detector">
+   </node>
+   <node pkg="controller_pkg"
+         type="pedestrian_detector.py"
+         name="pedestrian_detector">
    </node>
 </launch>
