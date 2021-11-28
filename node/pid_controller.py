@@ -77,7 +77,7 @@ def pid_callback(data):
 
 		if flag == 0:
 			mask = np.zeros((height,width,1), np.uint8)
-			cv2.rectangle(mask, (int(0.5*width),int(0.7*height)),(width,height),(255,0,0),-1)
+			cv2.rectangle(mask, (int(0.5*width),int(0.75*height)),(width,height),(255,0,0),-1)
 			# print("declared mask")
 			flag = 1
 		

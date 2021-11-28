@@ -8,39 +8,22 @@ from cv_bridge import CvBridge, CvBridgeError
 import time
 
 # Blue Cars
-uh = 125
-us = 255
-uv = 210
-lh = 115
-ls = 125
-lv = 100
-blue_lower_hsv = np.array([lh, ls, lv])
-blue_upper_hsv = np.array([uh, us, uv])
+blue_lower_hsv = np.array([115, 125, 100])
+blue_upper_hsv = np.array([125, 255, 210])
 
-# License Plate Big
-uh = 0
-us = 0
-uv = 205
-lh = 0
-ls = 0
-lv = 90
-white_lower_hsv = np.array([lh, ls, lv])
-white_upper_hsv = np.array([uh, us, uv])
+# White
+white_lower_hsv = np.array([0, 0, 90])
+white_upper_hsv = np.array([0, 0, 205])
 
 # Rev Plate
-uh = 0
-us = 0
-uv = 255
-lh = 0
-ls = 0
-lv = 0
-plate_lower_hsv = np.array([lh, ls, lv])
-plate_upper_hsv = np.array([uh, us, uv])
+plate_lower_hsv = np.array([0, 0, 0])
+plate_upper_hsv = np.array([0, 0, 255])
 
 best_sample = None
 best_masked_sample = None
 best_ratio = 0
 first_sample_time = 0
+MAX_PLATE_HEIGHT = 42
 
 def callback(data):
     global best_sample
@@ -49,7 +32,7 @@ def callback(data):
     global best_ratio
 
     if best_ratio != 0 and time.time() > first_sample_time + 2:
-      height, width = best_masked_sample.shape
+      _, sample_width = best_masked_sample.shape
       cv2.imshow("Best", best_sample)
       cv2.waitKey(3)
 
@@ -85,15 +68,19 @@ def callback(data):
       pts1 = np.float32([tl, tr, br, bl])
       pts2 = np.float32([[0, 0], [maxWidth-1, 0], [maxWidth-1, maxHeight-1], [0, maxHeight-1]])
       matrix = cv2.getPerspectiveTransform(pts1, pts2)
-      result = cv2.warpPerspective(best_sample, matrix, (maxWidth, maxHeight))
-      cv2.imshow('Lic. Plate', result)
+      license_plate = cv2.warpPerspective(best_sample, matrix, (maxWidth, maxHeight))
+      plate_height, plate_width, _ = license_plate.shape
+      height_diff = plate_height - MAX_PLATE_HEIGHT
+      if height_diff > 0:
+        license_plate = license_plate[height_diff:height_diff+MAX_PLATE_HEIGHT-1, 0:plate_width-1]
+      cv2.imshow('Lic. Plate', license_plate)
       cv2.waitKey(3)
 
-      pos_img = best_sample[0:min(tl[1], tr[1])-1, 0:width-1]
+      top_plate = min(tl[1], tr[1])
+      pos_img = best_sample[top_plate/2:top_plate-1, 0:sample_width-1]
       cv2.imshow('Position', pos_img)
       cv2.waitKey(3)
 
-      best_sample = None
       best_ratio = 0
 
     try:

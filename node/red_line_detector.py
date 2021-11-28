@@ -21,7 +21,7 @@ upper_hsv = np.array([uh, us, uv])
 MIN_RED_PIXELS = 50000
 
 last_stop_time = 0
-TIME_DELAY = 2.1
+TIME_DELAY = 3
 
 def callback(data):
   global last_stop_time
