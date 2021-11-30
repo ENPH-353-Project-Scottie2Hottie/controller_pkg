@@ -12,4 +12,8 @@
          type="pedestrian_detector.py"
          name="pedestrian_detector">
    </node>
+   <!-- <node pkg="controller_pkg"
+         type="license_plate_detector.py"
+         name="license_plate_detector">
+   </node> -->
 </launch>

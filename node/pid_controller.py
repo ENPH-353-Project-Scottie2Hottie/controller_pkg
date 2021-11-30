@@ -6,7 +6,6 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import String
 
 import numpy as np
-import matplotlib as plt
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import time
@@ -16,10 +15,12 @@ a_multiplier = 0.006
 v_multiplier = 0.002
 flag = 0
 mask = None
-path_follow = "Stop"
 
 last_go_time = 0
-TIME_DELAY = 10
+TIME_DELAY = 1.5
+begin = True
+start_time = 0
+START_DELAY = 1.5
 
 uh = 50
 us = 150
@@ -30,103 +31,119 @@ lv = 245
 
 lower_hsv = np.array([lh,ls,lv])
 upper_hsv = np.array([uh,us,uv])
+prev_state = "Go"
+
+red_line = False
+pedestrian = True
 
 def pid_callback(data):
+	global last_go_time
 	global flag
 	global mask
-	move = Twist()
-	if path_follow == "Stop":
-		move.linear.x = 0
-		move.angular.z = 0
-		pub.publish(move)
-	elif path_follow == "Go":
-		move.angular.x = 0
-		move.linear.x = velocity*2
-		pub.publish(move)
-		# time.sleep(2)
+	global begin
+	global start_time
+	global prev_state
+
+	if red_line and pedestrian:
+		curr_state = "Stop"
+	elif red_line and not pedestrian:
+		curr_state = "Go"
 	else:
-		# get image
-		cv_image = bridge.imgmsg_to_cv2(data, "bgr8")
-		cv_image = cv2.medianBlur(cv_image,5)
+		curr_state = "Follow"
 
-		# cv2.imwrite("robot_view.png",cv_image)
+	if begin:
+		start_time = rospy.get_time()
+		begin = False
+	elif rospy.get_time() < start_time + START_DELAY:
+		start()
+	elif rospy.get_time() < last_go_time + TIME_DELAY:
+		return
+	elif curr_state == "Stop":
+		stop()
+		prev_state = curr_state
+	elif curr_state == "Go":
+		go()
+		prev_state = curr_state
+		last_go_time = rospy.get_time()
+	else:
+		if prev_state != "Stop":
+			move = Twist()
+			cv_image = bridge.imgmsg_to_cv2(data, "bgr8")
+			cv_image = cv2.medianBlur(cv_image,5)
 
-		# Get dimensions of image
-		dimensions = cv_image.shape
-		height = dimensions[0]
-		width = dimensions[1]
-		centreline = width / 2
+			dimensions = cv_image.shape
+			height = dimensions[0]
+			width = dimensions[1]
 
-		# Convert BGR to HSV
-		hsv = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
-		binary = cv2.inRange(hsv, lower_hsv, upper_hsv)
-		
+			hsv = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
+			binary = cv2.inRange(hsv, lower_hsv, upper_hsv)
 
-		# Construct right guide-line equation (w = m*h + b):
-		# #Original:
-		# m = 8.7/6
-		# b = 2.4*width/24.6
+			b_shift = 50
+			m = 8.7/6
+			b = 2.4*width/24.6 + b_shift
 
-		# Experiment:
-		b_shift = 50
-		m = 8.7/6
-		b = 2.4*width/24.6 + b_shift
+			if flag == 0:
+				mask = np.zeros((height,width,1), np.uint8)
+				cv2.rectangle(mask, (int(0.5*width),int(0.75*height)),(width,height),(255,0,0),-1)
+				flag = 1
 
-		# reference = int(0.75 * width)
-		# cropped = binary[int(0.7*height):,int(0.5*width):]
+			masked_img = cv2.bitwise_and(binary, mask)
 
-		if flag == 0:
-			mask = np.zeros((height,width,1), np.uint8)
-			cv2.rectangle(mask, (int(0.5*width),int(0.75*height)),(width,height),(255,0,0),-1)
-			# print("declared mask")
-			flag = 1
-		
+			M = cv2.moments(masked_img)
 
-		masked_img = cv2.bitwise_and(binary, mask)
-		# cv2.imshow("masked", masked_img)
+			if M["m00"] != 0:
+				cX = int(M["m10"] / M["m00"])
+				cY = int(M["m01"] / M["m00"])
 
-		M = cv2.moments(masked_img)
+				desiredX = int(m*cY + b)
 
-		if M["m00"] != 0:
-			cX = int(M["m10"] / M["m00"])
-			cY = int(M["m01"] / M["m00"])
+				error = desiredX - cX
 
-			desiredX = int(m*cY + b)
+				angular = float(a_multiplier*(error)) 
 
-			# currState = cv2.circle(cv_image, (cX, cY), 10, (0,0,255))
-			# desiredState = cv2.circle(cv_image, (desiredX, cY), 10, (255,0,0))
-			# cv2.imshow("", desiredState)
-			# cv2.waitKey(1)
+				move.angular.z = angular
+				move.linear.x = velocity*(1 - v_multiplier*abs(error))
 
-			error = desiredX - cX
-
-			angular = float(a_multiplier*(error)) 
-			# print(angular)
-
-			# Publisher: publish velocity commands
-
-			move.angular.z = angular
-			move.linear.x = velocity*(1 - v_multiplier*abs(error))
-
-			pub.publish(move)
+				pub.publish(move)
 	
-def path_follow_callback(msg):
-	global path_follow
-	global last_go_time
-	if msg.data == "Go":
-		if time.time() > last_go_time + TIME_DELAY:
-			path_follow = msg.data
-			last_go_time = time.time()
+def red_line_callback(msg):
+	global red_line
+	if msg.data == "True":
+		red_line = True
 	else:
-		path_follow = msg.data
+		red_line = False
 
-# Subscriber: get image data
+def ped_callback(msg):
+	global pedestrian
+	if msg.data == "False":
+		pedestrian = False
+	else:
+		pedestrian = True
+
+def stop():
+	move = Twist()
+	move.linear.x = 0
+	move.angular.z = 0
+	pub.publish(move)
+
+def go():
+	move = Twist()
+	move.angular.x = 0
+	move.linear.x = velocity*2.5
+	pub.publish(move)
+
+def start():
+	move = Twist()
+	move.linear.x = 0.25
+	move.angular.z = 0.4
+	pub.publish(move)
 
 if __name__ == "__main__":
-	bridge = CvBridge()
 	rospy.init_node('pid_controller')
+	bridge = CvBridge()
 	pub = rospy.Publisher('/R1/cmd_vel', Twist, queue_size=1)
 	rospy.Subscriber("/R1/pi_camera/image_raw", Image, pid_callback)
-	rospy.Subscriber("/path_follow", String, path_follow_callback)
+	rospy.Subscriber("/red_line", String, red_line_callback)
+	rospy.Subscriber("/pedestrian", String, ped_callback)
 	time.sleep(1)
 	rospy.spin()

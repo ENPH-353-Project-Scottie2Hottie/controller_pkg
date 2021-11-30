@@ -10,67 +10,61 @@ import time
 
 prev_frame = None
 has_prev_frame = False
-moving = True
+red_line = False
 MAX_NON_ZERO = 100
-
-last_stop_time = 0
-TIME_DELAY = 15
+FRAME_GAP = 3
+TIME_GAP = 0.1
+frame_count = 0
+prev_frame_time = 0
 
 def callback(data):
-    global moving
     global prev_frame
     global has_prev_frame
     global prev_frame_time
-    global last_stop_time
-    if time.time() < last_stop_time + TIME_DELAY:
-        return
-    try:
-        cv_image = bridge.imgmsg_to_cv2(data, "bgr8")
-        if moving:
-            prev_frame = None
-            has_prev_frame = False
-            # rows, cols, channels = cv_image.shape
-            # blank_image = np.zeros((rows,cols), np.uint8)
-            # cv2.imshow("Background Sub.", blank_image)
-            # cv2.waitKey(3)
-        elif not has_prev_frame:
-            prev_frame = cv_image
-            has_prev_frame = True
-            # rows, cols, channels = cv_image.shape
-            # blank_image = np.zeros((rows,cols), np.uint8)
-            # cv2.imshow("Background Sub.", blank_image)
-            # cv2.waitKey(3)
-        else:
+    global frame_count
+    global prev_frame_time
+    # if frame_count > 0:
+    #     frame_count += 1
+    #     if frame_count == FRAME_GAP:
+    #         frame_count = 0
+    #     pub.publish("True")
+    if rospy.get_time() < prev_frame_time + TIME_GAP:
+        pub.publish("True")
+    else:
+        prev_frame_time = rospy.get_time()
+        try:
+            cv_image = bridge.imgmsg_to_cv2(data, "bgr8")
+            if not has_prev_frame:
+                has_prev_frame = True
+                prev_frame = cv_image
             stack_image = cv2.subtract(cv_image, prev_frame)
             gray = cv2.cvtColor(stack_image, cv2.COLOR_BGR2GRAY)
             _, thresh = cv2.threshold(gray,25,255,cv2.THRESH_BINARY)
-            # cv2.imshow("Background Sub.", thresh)
-            # cv2.waitKey(3)
             prev_frame = cv_image
             has_prev_frame = True
             num_non_zero = cv2.countNonZero(thresh)
             if num_non_zero < MAX_NON_ZERO:
-                pub.publish("Go")
-                moving = True
+                pub.publish("False")
             else:
-                pub.publish("Stop")
+                pub.publish("True")
 
-    except CvBridgeError as e:
-        prev_frame = None
-        has_prev_frame = False
-        print(e)
+        except CvBridgeError as e:
+            prev_frame = None
+            has_prev_frame = False
+            print(e)
 
-def check_moving(msg):
-    global moving
-    if msg.data == "False":
-        moving = True
+def check_red(msg):
+    global red_line
+    if msg.data == "True":
+        red_line = True
     else:
-        moving = False
+        red_line = False
 
 if __name__ == '__main__':
     bridge = CvBridge()
     rospy.init_node('pedestrian_detector')
     rospy.Subscriber('/R1/pi_camera/image_raw', Image, callback)
-    rospy.Subscriber('/red_line', String, check_moving)
-    pub = rospy.Publisher('/path_follow', String, queue_size=1)
+    rospy.Subscriber('/red_line', String, check_red)
+    pub = rospy.Publisher('/pedestrian', String, queue_size=1)
+    time.sleep(1)
     rospy.spin()

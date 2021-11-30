@@ -18,17 +18,9 @@ lv = 0
 
 lower_hsv = np.array([lh, ls, lv])
 upper_hsv = np.array([uh, us, uv])
-MIN_RED_PIXELS = 50000
-
-last_stop_time = 0
-TIME_DELAY = 3
+MIN_RED_PIXELS = 35000
 
 def callback(data):
-  global last_stop_time
-  if time.time() < last_stop_time + TIME_DELAY:
-    # pub.publish("False")
-    return
-  
   try:
     cv_image = bridge.imgmsg_to_cv2(data, "bgr8")
     hsv = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
@@ -38,17 +30,14 @@ def callback(data):
   mask = cv2.inRange(hsv, lower_hsv, upper_hsv)
   num_red_pixels = cv2.countNonZero(mask)
   if num_red_pixels > MIN_RED_PIXELS:
-    last_stop_time = time.time()
-    pub_ped.publish("True")
+    pub.publish("True")
   else:
-    pub_pid.publish("Continue")
-    pub_ped.publish("False")
-
+    pub.publish("False")
 
 if __name__ == '__main__':
     bridge = CvBridge()
     rospy.init_node('red_line_detector')
-    pub_ped = rospy.Publisher('/red_line', String, queue_size=1)
-    pub_pid = rospy.Publisher('/path_follow', String, queue_size=1)
+    pub = rospy.Publisher('/red_line', String, queue_size=1)
     rospy.Subscriber('/R1/pi_camera/image_raw', Image, callback)
+    time.sleep(1)
     rospy.spin()
