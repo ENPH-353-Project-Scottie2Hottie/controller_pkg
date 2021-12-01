@@ -1,10 +1,6 @@
 <launch>
    <!-- My Package launch file -->
    <node pkg="controller_pkg"
-         type="pid_controller.py"
-         name="pid_controller">
-   </node>
-   <node pkg="controller_pkg"
          type="red_line_detector.py"
          name="red_line_detector">
    </node>
@@ -12,8 +8,12 @@
          type="pedestrian_detector.py"
          name="pedestrian_detector">
    </node>
-   <!-- <node pkg="controller_pkg"
+   <node pkg="controller_pkg"
+         type="pid_controller.py"
+         name="pid_controller">
+   </node>
+   <node pkg="controller_pkg"
          type="license_plate_detector.py"
          name="license_plate_detector">
-   </node> -->
+   </node>
 </launch>

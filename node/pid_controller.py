@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+import time
 import rospy
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Image
@@ -35,6 +36,7 @@ prev_state = "Go"
 
 red_line = False
 pedestrian = True
+lpd_started = False
 
 def pid_callback(data):
 	global last_go_time
@@ -43,6 +45,9 @@ def pid_callback(data):
 	global begin
 	global start_time
 	global prev_state
+
+	if not lpd_started:
+		return
 
 	if red_line and pedestrian:
 		curr_state = "Stop"
@@ -134,9 +139,14 @@ def go():
 
 def start():
 	move = Twist()
-	move.linear.x = 0.25
+	move.linear.x = 0.22
 	move.angular.z = 0.4
 	pub.publish(move)
+
+def lpd_callback(msg):
+  	global lpd_started
+	if msg.data == 'Started':
+  		lpd_started = True
 
 if __name__ == "__main__":
 	rospy.init_node('pid_controller')
@@ -145,5 +155,6 @@ if __name__ == "__main__":
 	rospy.Subscriber("/R1/pi_camera/image_raw", Image, pid_callback)
 	rospy.Subscriber("/red_line", String, red_line_callback)
 	rospy.Subscriber("/pedestrian", String, ped_callback)
+	rospy.Subscriber('/lpd_status', String, lpd_callback)
 	time.sleep(1)
 	rospy.spin()

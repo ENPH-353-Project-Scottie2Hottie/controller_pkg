@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
+import time
 import rospy
 import numpy as np
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
-import time
 
 # Red Line
 uh = 10

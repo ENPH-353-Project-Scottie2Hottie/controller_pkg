@@ -2,13 +2,25 @@
 
 import rospy
 import numpy as np
-from sensor_msgs.msg import Image
+import string
 import cv2
+from sensor_msgs.msg import Image
+from std_msgs.msg import String
 from cv_bridge import CvBridge, CvBridgeError
 import time
-import random
+import tensorflow as tf
+from tensorflow.keras import models
+from tensorflow.python.keras.backend import set_session
 
-# Blue Cars
+sess1 = tf.Session()
+graph1 = tf.get_default_graph()
+set_session(sess1)
+
+model_path = '/home/fizzer/ros_ws/src/controller_pkg/node/saved_model'
+plate_model = models.load_model(model_path)
+alphabet = string.ascii_uppercase + '0123456789'
+
+# Blue
 blue_lower_hsv = np.array([115, 125, 100])
 blue_upper_hsv = np.array([125, 255, 210])
 
@@ -24,23 +36,41 @@ best_sample = None
 best_masked_sample = None
 best_ratio = 0
 first_sample_time = 0
-# MAX_PLATE_HEIGHT = 25
+SAMPLE_INTERVAL = 2
 MAX_PLATE_HEIGHT = 40
-MAX_POS_HEIGHT = 60
-sample_count = 0
-set_num = 0
+# sample_count = 0
+# set_num = 0
+PLATES_TO_CHECK = 6
+checked_positions = np.zeros(PLATES_TO_CHECK)
+finished = False
+sent_end_message = False
+
+team_id = 'Scottie'
+password = '2Hottie'
+start_msg = team_id + ',' + password + ',0,SB04'
+end_msg = team_id + ',' + password + ',-1,SB04'
 
 def callback(data):
-    global best_sample
-    global first_sample_time
-    global best_masked_sample
-    global best_ratio
-    global sample_count
+  global best_sample
+  global first_sample_time
+  global best_masked_sample
+  global best_ratio
+  global sample_count
+  global sess1
+  global graph1
+  global checked_positions
+  global finished
+  global sent_end_message
 
-    if best_ratio != 0 and rospy.get_time() > first_sample_time + 2:
+  if not sent_end_message:
+    if best_ratio != 0 and rospy.get_time() > first_sample_time + SAMPLE_INTERVAL:
+      if finished and not sent_end_message:
+        rospy.sleep(0.2)
+        pub.publish(end_msg)
+        sent_end_message = True
+        return
       cv2.imshow("Best", best_sample)
       cv2.waitKey(3)
-
       best_masked_sample = morph(best_masked_sample, 3, 5)
       _, contours, _ = cv2.findContours(best_masked_sample, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
       max_contour = max(contours, key=len)
@@ -78,20 +108,17 @@ def callback(data):
       height_diff = plate_height - MAX_PLATE_HEIGHT
       if height_diff > 0:
         license_plate = license_plate[height_diff/2:height_diff/2+MAX_PLATE_HEIGHT, 0:plate_width]
-      cv2.imshow('Lic. Plate', license_plate)
-      cv2.waitKey(3)
+      # cv2.imshow('Lic. Plate', license_plate)
+      # cv2.waitKey(3)
 
       top_plate = min(tl[1], tr[1])
       pos_img = best_sample[top_plate/2:top_plate, :]
-      cv2.imshow('Position', pos_img)
-      cv2.waitKey(3)
+      # cv2.imshow('Position', pos_img)
+      # cv2.waitKey(3)
 
 
       img = license_plate
-      dimensions = img.shape
-      height = dimensions[0]
-      width = dimensions[1]
-
+      _, width, _ = img.shape
       resize_dim = (42,40)
 
       let1 = img[:, :int(0.25*width)]
@@ -124,20 +151,37 @@ def callback(data):
       pos_num = cv2.adaptiveThreshold(pos_num,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
                 cv2.THRESH_BINARY_INV,21,10)
 
-      # cv2.imshow("L1", let1)
-      # cv2.waitKey(3)
-      # cv2.imshow("L2", let2)
-      # cv2.waitKey(3)
-      # cv2.imshow("N3", num3)
-      # cv2.waitKey(3)
-      # cv2.imshow("N4", num4)
-      # cv2.waitKey(3)
-      # cv2.imshow("P", pos_num)
-      # cv2.waitKey(3)
+      let1 = let1/255.
+      let2 = let2/255.
+      num3 = num3/255.
+      num4 = num4/255.
+      pos_num = pos_num/255.
 
-      cv2.imwrite('plate' + str(sample_count + 6*set_num) + '.png', license_plate)
+      let1 = let1.reshape(1,40,42,1)
+      let2 = let2.reshape(1,40,42,1)
+      num3 = num3.reshape(1,40,42,1)
+      num4 = num4.reshape(1,40,42,1)
+      pos_num = pos_num.reshape(1,40,42,1)
+      
+      with graph1.as_default():
+        set_session(sess1)
+
+        let1_pred = alphabet[np.argmax(plate_model.predict(let1)[0][:26])]
+        let2_pred = alphabet[np.argmax(plate_model.predict(let2)[0][:26])]
+        num3_pred = alphabet[np.argmax(plate_model.predict(num3)[0][26:36]) + 26]
+        num4_pred = alphabet[np.argmax(plate_model.predict(num4)[0][26:36]) + 26]
+        pos_pred = np.argmax(plate_model.predict(pos_num)[0])
+        if pos_pred >= 26:
+          pos_pred = alphabet[pos_pred]
+          prediction = str(pos_pred) + ',' + let1_pred + let2_pred + str(num3_pred) + str(num4_pred)
+          pub.publish(team_id + ',' + password + ',' + prediction)
+          checked_positions[int(pos_pred) - 1] = 1
+          if (checked_positions == np.ones(PLATES_TO_CHECK)).all():
+            finished = True
+
+      # cv2.imwrite('plate' + str(sample_count + 6*set_num) + '.png', license_plate)
       # cv2.imwrite('pos' + str(sample_count + 6*set_num) + '.png', pos_img)
-      sample_count += 1
+      # sample_count += 1
 
       best_ratio = 0
 
@@ -210,7 +254,12 @@ def morph(mask, close_size, open_size):
   return mask
 
 if __name__ == '__main__':
-    bridge = CvBridge()
-    rospy.init_node('threshold_test')
-    rospy.Subscriber('/R1/pi_camera/image_raw', Image, callback)
-    rospy.spin()
+  bridge = CvBridge()
+  rospy.init_node('threshold_test')
+  pub = rospy.Publisher('/license_plate', String, queue_size=1)
+  pub_started = rospy.Publisher('/lpd_status', String, queue_size=1)
+  rospy.Subscriber('/R1/pi_camera/image_raw', Image, callback)
+  time.sleep(2)
+  pub.publish(start_msg)
+  pub_started.publish('Started')
+  rospy.spin()
