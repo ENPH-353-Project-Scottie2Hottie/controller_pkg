@@ -66,6 +66,7 @@ def callback(data):
     if best_ratio != 0 and rospy.get_time() > first_sample_time + SAMPLE_INTERVAL:
       if finished and not sent_end_message:
         rospy.sleep(0.2)
+        pub_status.publish('Done')
         pub.publish(end_msg)
         sent_end_message = True
         return
@@ -257,9 +258,9 @@ if __name__ == '__main__':
   bridge = CvBridge()
   rospy.init_node('threshold_test')
   pub = rospy.Publisher('/license_plate', String, queue_size=1)
-  pub_started = rospy.Publisher('/lpd_status', String, queue_size=1)
+  pub_status = rospy.Publisher('/lpd_status', String, queue_size=1)
   rospy.Subscriber('/R1/pi_camera/image_raw', Image, callback)
   time.sleep(2)
   pub.publish(start_msg)
-  pub_started.publish('Started')
+  pub_status.publish('Started')
   rospy.spin()

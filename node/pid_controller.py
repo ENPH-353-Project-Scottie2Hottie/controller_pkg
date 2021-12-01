@@ -36,7 +36,7 @@ prev_state = "Go"
 
 red_line = False
 pedestrian = True
-lpd_started = False
+lpd_running = False
 
 def pid_callback(data):
 	global last_go_time
@@ -46,7 +46,8 @@ def pid_callback(data):
 	global start_time
 	global prev_state
 
-	if not lpd_started:
+	if not lpd_running:
+		stop()
 		return
 
 	if red_line and pedestrian:
@@ -144,9 +145,11 @@ def start():
 	pub.publish(move)
 
 def lpd_callback(msg):
-  	global lpd_started
+	global lpd_running
 	if msg.data == 'Started':
-  		lpd_started = True
+		lpd_running = True
+	elif msg.data == 'Done':
+		lpd_running = False
 
 if __name__ == "__main__":
 	rospy.init_node('pid_controller')
