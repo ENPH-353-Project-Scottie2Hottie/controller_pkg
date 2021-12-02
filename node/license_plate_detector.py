@@ -44,6 +44,7 @@ PLATES_TO_CHECK = 6
 checked_positions = np.zeros(PLATES_TO_CHECK)
 finished = False
 sent_end_message = False
+running = False
 
 team_id = 'Scottie'
 password = '2Hottie'
@@ -61,6 +62,10 @@ def callback(data):
   global checked_positions
   global finished
   global sent_end_message
+  global running
+
+  if running:
+    pub_status.publish('Started')
 
   if not sent_end_message:
     if best_ratio != 0 and rospy.get_time() > first_sample_time + SAMPLE_INTERVAL:
@@ -69,9 +74,10 @@ def callback(data):
         pub_status.publish('Done')
         pub.publish(end_msg)
         sent_end_message = True
+        running = False
         return
-      cv2.imshow("Best", best_sample)
-      cv2.waitKey(3)
+      # cv2.imshow("Best", best_sample)
+      # cv2.waitKey(3)
       best_masked_sample = morph(best_masked_sample, 3, 5)
       _, contours, _ = cv2.findContours(best_masked_sample, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
       max_contour = max(contours, key=len)
@@ -229,8 +235,8 @@ def callback(data):
           # print("ratio=", ratio)
           # print("area=", white_area)
           plate = cv_image[white_top_y:white_bot_y, white_left_x:white_right_x]
-          cv2.imshow("Plate", plate)
-          cv2.waitKey(3)
+          # cv2.imshow("Plate", plate)
+          # cv2.waitKey(3)
 
           binary_plate = plate_mask[white_top_y:white_bot_y, white_left_x:white_right_x]
 
@@ -263,4 +269,5 @@ if __name__ == '__main__':
   time.sleep(2)
   pub.publish(start_msg)
   pub_status.publish('Started')
+  running = True
   rospy.spin()
