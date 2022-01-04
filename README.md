@@ -23,7 +23,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/ENPH-353-Project-Scottie2Hottie/controller_pkg">
-    <img src="images/logo.png" alt="Logo" width="80" height="80">
+    <img src="logo.png" alt="Logo" width="80" height="80">
   </a>
 
 <h3 align="center">Autonomous Parking Robot</h3>
@@ -61,8 +61,6 @@
   </ol>
 </details>
 
-
-
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
@@ -77,8 +75,6 @@ NOTE: Must use Lubuntu 18.04
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
-
-
 ### Built With
 
 * [Python 2.7](https://www.python.org/download/releases/2.7/)
@@ -89,12 +85,10 @@ NOTE: Must use Lubuntu 18.04
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
-
-
 <!-- GETTING STARTED -->
 ## Getting Started
 
-Refer to * [Competition Rules](https://github.com/ENPH-353-Project-Scottie2Hottie/controller_pkg/blob/main/Competition_Rules.pdf) for instructions on how to set up ROS environment
+Refer to [Competition Rules](https://github.com/ENPH-353-Project-Scottie2Hottie/controller_pkg/blob/main/Competition_Rules.pdf) for instructions on how to set up ROS environment
 
 ### Prerequisites
 
@@ -123,14 +117,14 @@ Refer to * [Competition Rules](https://github.com/ENPH-353-Project-Scottie2Hotti
    catkin_make
    ```
 
-3. Clone the repo to overwrite new package
+4. Clone the repo to overwrite new package
    ```sh
    cd ~/ros_ws/src
    ```
    ```sh
    git clone https://github.com/ENPH-353-Project-Scottie2Hottie/controller_pkg.git
    ```
-3. Build the environment again
+5. Build the environment again
    ```sh
    cd ~/ros_ws
    ```
@@ -139,8 +133,6 @@ Refer to * [Competition Rules](https://github.com/ENPH-353-Project-Scottie2Hotti
    ```
 
 <p align="right">(<a href="#top">back to top</a>)</p>
-
-
 
 <!-- USAGE EXAMPLES -->
 ## Usage
